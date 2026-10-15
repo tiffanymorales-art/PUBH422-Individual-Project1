@@ -1,0 +1,272 @@
+---
+title: "PUBH 422 - Individual Project 1"
+author: "Tiffany Morales"
+date: "2026-10-14"
+output: html_document
+---
+# Introduction
+
+This project analyzes the 2020 Health Information National Trends Survey (HINTS) dataset using R. The analysis includes data management, descriptive statistics, comparisons by smoking status, and data visualizations.
+
+# Section A: Data Management
+
+```{r setup, message=FALSE, warning=FALSE}
+library(dplyr)
+library(skimr)
+library(ggplot2)
+
+data_name <- read.csv("HINTSData_2020_clean.csv")
+```
+
+## Dataset Overview
+
+```{r data-overview}
+dim(data_name)
+names(data_name)
+head(data_name)
+```
+
+The dataset contains 2,402 observations and 17 variables.
+
+## Missing Values
+
+```{r missing-values}
+colSums(is.na(data_name))
+any(is.na(data_name))
+```
+
+No missing values were identified using R's `is.na()` function. However, survey response codes may represent additional missing or nonresponse values.
+
+# Section B: Descriptive Statistics
+
+## Quantitative Variables
+
+The four quantitative variables examined are Age, AvgDrinksPerWeek, WeeklyMinutesModerateExercise, and BMI.
+
+```{r descriptive-statistics}
+quant_vars <- data_name[, c(
+  "Age",
+  "AvgDrinksPerWeek",
+  "WeeklyMinutesModerateExercise",
+  "BMI"
+)]
+
+descriptive_stats <- data.frame(
+  Variable = names(quant_vars),
+  Minimum = sapply(quant_vars, min, na.rm = TRUE),
+  Q1 = sapply(quant_vars, function(x) quantile(x, 0.25, na.rm = TRUE)),
+  Median = sapply(quant_vars, median, na.rm = TRUE),
+  Mean = sapply(quant_vars, mean, na.rm = TRUE),
+  Q3 = sapply(quant_vars, function(x) quantile(x, 0.75, na.rm = TRUE)),
+  Maximum = sapply(quant_vars, max, na.rm = TRUE),
+  SD = sapply(quant_vars, sd, na.rm = TRUE),
+  Variance = sapply(quant_vars, var, na.rm = TRUE),
+  row.names = NULL
+)
+
+knitr::kable(descriptive_stats, digits = 2)
+```
+
+The average respondent age was approximately 55.59 years, with a median of 58 years. Average BMI was 28.61, while median BMI was 27.50. Weekly exercise averaged 161.78 minutes, compared with a median of 90 minutes, suggesting a right-skewed distribution. Average drinks per week was 3.36, while the median was zero.
+
+## Grouped Statistics by Smoking Status
+
+```{r grouped-statistics}
+grouped_summary <- data_name %>%
+  group_by(smokeStat) %>%
+  summarise(
+    Count = n(),
+    Mean_Age = mean(Age, na.rm = TRUE),
+    SD_Age = sd(Age, na.rm = TRUE),
+    Mean_BMI = mean(BMI, na.rm = TRUE),
+    SD_BMI = sd(BMI, na.rm = TRUE),
+    Mean_Exercise = mean(WeeklyMinutesModerateExercise, na.rm = TRUE),
+    SD_Exercise = sd(WeeklyMinutesModerateExercise, na.rm = TRUE),
+    Mean_Drinks = mean(AvgDrinksPerWeek, na.rm = TRUE),
+    SD_Drinks = sd(AvgDrinksPerWeek, na.rm = TRUE)
+  )
+
+knitr::kable(grouped_summary, digits = 2)
+```
+
+Smoking-status category 2 had the highest mean age, while category 1 had the highest average number of drinks per week. Mean BMI was similar across the three categories. The smoking-status codes are retained as numeric categories because their descriptive labels have not yet been verified.
+
+## Additional Summary Using skimr
+
+```{r skim-summary}
+skim(quant_vars)
+```
+
+## Custom Summary Function
+
+```{r custom-summary}
+my_summary_func <- function(x) {
+  c(
+    Minimum = min(x, na.rm = TRUE),
+    Q1 = unname(quantile(x, 0.25, na.rm = TRUE)),
+    Median = median(x, na.rm = TRUE),
+    Mean = mean(x, na.rm = TRUE),
+    Q3 = unname(quantile(x, 0.75, na.rm = TRUE)),
+    Maximum = max(x, na.rm = TRUE),
+    SD = sd(x, na.rm = TRUE),
+    Variance = var(x, na.rm = TRUE)
+  )
+}
+
+my_summary_func(data_name$Age)
+my_summary_func(data_name$BMI)
+```
+
+## Categorical Variables
+
+The four categorical variables examined are QualityCare, BirthGender, smokeStat, and RaceEthn5. Frequency tables are used to summarize the number of observations in each category.
+
+```{r categorical-summary}
+categorical_vars <- c(
+  "QualityCare",
+  "BirthGender",
+  "smokeStat",
+  "RaceEthn5"
+)
+
+for (variable in categorical_vars) {
+  cat("\n\n###", variable, "\n\n")
+  frequency_table <- as.data.frame(
+    table(data_name[[variable]])
+  )
+  names(frequency_table) <- c("Category", "Frequency")
+
+  frequency_table$Percentage <- round(
+    100 * frequency_table$Frequency /
+      sum(frequency_table$Frequency), 2
+  )
+
+  print(knitr::kable(frequency_table))
+}
+```
+
+The categories are displayed using their original numeric codes. Their meanings should be verified against the HINTS codebook before assigning descriptive labels.
+
+# Section C: Data Visualizations
+
+This section presents visualizations of four variables from the 2020 HINTS dataset: QualityCare, RaceEthn5, Age, and BMI. Bar charts are used for categorical variables, while histograms are used for quantitative variables.
+
+## Quality of Care
+```{r quality-care-plot}
+ggplot(data_name, aes(x = factor(QualityCare))) +
+  geom_bar(fill = "steelblue", color = "black") +
+  labs(
+    title = "Distribution of Quality of Care",
+    x = "Quality of Care Category",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+```
+
+The bar chart shows the distribution of responses for quality of care. Category 2 was the most frequently reported response, with 1,033 respondents (43.01%), followed by category 1 with 764 respondents (31.81%). Category 5 had the fewest responses, with 25 respondents (1.04%). These results show that responses were concentrated in categories 1 and 2. The numeric category labels are retained because their meanings have not yet been verified against the HINTS codebook.
+
+## Race and Ethnicity
+
+```{r race-ethnicity-plot}
+ggplot(data_name, aes(x = factor(RaceEthn5))) +
+  geom_bar(fill = "steelblue", color = "black") +
+  labs(
+    title = "Distribution of Race and Ethnicity",
+    x = "Race/Ethnicity Category",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+```
+
+The bar chart shows that category 1 had the highest frequency, representing 1,548 respondents (64.45%). Category 3 accounted for 357 respondents (14.86%), followed by category 2 with 312 respondents (12.99%). Categories 4 and 5 had the lowest frequencies, representing 4.00% and 3.71% of respondents, respectively. These results indicate that most respondents belonged to category 1. The numeric categories are retained because their descriptive meanings have not yet been verified against the HINTS codebook.
+
+
+## Age Distribution
+
+```{r age-histogram}
+ggplot(data_name, aes(x = Age)) +
+  geom_histogram(
+    binwidth = 5,
+    fill = "steelblue",
+    color = "black"
+  ) +
+  labs(
+    title = "Distribution of Age",
+    x = "Age (years)",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+```
+
+The histogram shows the distribution of respondents' ages in the 2020 HINTS dataset. The average age was approximately 55.59 years, while the median was 58 years. Respondents ranged from 18 to 100 years old. Most respondents were concentrated in the middle and older age ranges.
+
+
+## BMI Distribution
+
+```{r bmi-histogram}
+ggplot(data_name, aes(x = BMI)) +
+  geom_histogram(
+    binwidth = 2,
+    fill = "steelblue",
+    color = "black"
+  ) +
+  labs(
+    title = "Distribution of BMI",
+    x = "Body Mass Index (BMI)",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+```
+
+The histogram shows the distribution of BMI values among respondents in the 2020 HINTS dataset. The mean BMI was approximately 28.61, while the median was 27.50. BMI values ranged from 10.9 to 73.8. Since the mean is higher than the median, the distribution suggests some right skewness, with a smaller number of respondents having relatively high BMI values.
+
+
+## Custom Visualization Functions
+
+The following functions generate visualizations for categorical and quantitative variables.
+
+```{r custom-visual-functions}
+my_visual_func_I <- function(data, variable, title) {
+  ggplot(data, aes(x = factor(.data[[variable]]))) +
+    geom_bar(fill = "steelblue", color = "black") +
+    labs(
+      title = title,
+      x = "Category",
+      y = "Frequency"
+    ) +
+    theme_minimal()
+}
+
+my_visual_func_II <- function(data, variable, title) {
+  ggplot(data, aes(x = .data[[variable]])) +
+    geom_histogram(
+      bins = 20,
+      fill = "steelblue",
+      color = "black"
+    ) +
+    labs(
+      title = title,
+      x = variable,
+      y = "Frequency"
+    ) +
+    theme_minimal()
+}
+```
+
+### Testing the Custom Functions
+
+```{r test-custom-functions}
+my_visual_func_I(
+  data_name,
+  "QualityCare",
+  "Quality of Care Using Custom Function"
+)
+
+my_visual_func_II(
+  data_name,
+  "BMI",
+  "BMI Using Custom Function"
+)
+```
+
+These functions demonstrate how reusable R code can create bar charts for categorical variables and histograms for quantitative variables.
